@@ -1,7 +1,7 @@
 # This file is copyrighted under the BSD-license for buildsystem files of KDE
 # copyright 2010, Patrick Spendrin <ps_ml@gmx.de>
 
-cmake_minimum_required(VERSION 3.1.3)
+cmake_minimum_required(VERSION 3.1.3...3.15.0)
 
 project(expat
     VERSION
@@ -9,6 +9,18 @@ project(expat
     LANGUAGES
         C
 )
+
+## Separate version number into 4 parts
+string(REGEX MATCHALL "[0-9]+" _my_ver_LIST "${PROJECT_VERSION}")
+list(LENGTH _my_ver_LIST _my_list_len)
+list(GET _my_ver_LIST 0 EXPAT_VER_MAJOR)
+list(GET _my_ver_LIST 1 EXPAT_VER_MINOR)
+list(GET _my_ver_LIST 2 EXPAT_VER_PATCH)
+if(_my_list_len EQUAL 4)
+    list(GET _my_ver_LIST 3 EXPAT_VER_PATCHLEVEL)
+endif()
+
+message( STATUS "expat version ${PROJECT_VERSION}" )
 
 set(PACKAGE_BUGREPORT "expat-bugs@libexpat.org")
 set(PACKAGE_NAME "expat")
@@ -73,6 +85,31 @@ option(EXPAT_MIN_SIZE "Get a smaller (but slower) parser (in particular avoid mu
 mark_as_advanced(EXPAT_MIN_SIZE)
 if(MSVC OR _EXPAT_HELP)
     set(EXPAT_MSVC_STATIC_CRT OFF CACHE BOOL "Use /MT flag (static CRT) when compiling in MSVC")
+endif()
+
+option(EXPAT_WITH_SHARED_LIBRARIES "Build shared version of the expat library." OFF)
+option(EXPAT_WITHOUT_APPS "Build expat without apps." OFF)
+option(EXPAT_WITHOUT_INSTALL_ALL "Build expat without installing all artifacts." OFF)
+option(EXPAT_WITHOUT_INSTALL_FILES "Build expat without installing files." OFF)
+option(EXPAT_WITHOUT_INSTALL_HEADERS "Build expat without installing headers." OFF)
+option(EXPAT_WITHOUT_INSTALL_LIBRARIES "Build expat without installing libraries." OFF)
+option(EXPAT_WITHOUT_TEST_APPS "Build expat without test apps." OFF)
+if(EXPAT_WITHOUT_APPS)
+    set(EXPAT_BUILD_EXAMPLES OFF)
+    set(EXPAT_BUILD_TOOLS OFF)
+else()
+    set(EXPAT_BUILD_EXAMPLES ON)
+    set(EXPAT_BUILD_TOOLS ON)
+endif()
+if(EXPAT_WITHOUT_TEST_APPS)
+    set(EXPAT_BUILD_TESTS OFF)
+else()
+    set(EXPAT_BUILD_TESTS ON)
+endif()
+if(EXPAT_WITH_SHARED_LIBRARIES)
+    set(EXPAT_SHARED_LIBS ON)
+else()
+    set(EXPAT_SHARED_LIBS OFF)
 endif()
 
 #
@@ -161,8 +198,9 @@ endmacro()
 
 configure_file(expat_config.h.cmake "${CMAKE_CURRENT_BINARY_DIR}/expat_config.h")
 add_definitions(-DHAVE_EXPAT_CONFIG_H)
-expat_install(FILES "${CMAKE_CURRENT_BINARY_DIR}/expat_config.h" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-
+if(NOT EXPAT_WITHOUT_INSTALL_HEADERS AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+    expat_install(FILES "${CMAKE_CURRENT_BINARY_DIR}/expat_config.h" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
 
 set(EXTRA_COMPILE_FLAGS)
 if(FLAG_NO_STRICT_ALIASING)
@@ -229,7 +267,7 @@ if(WIN32)
             set(_POSTFIX_DEBUG "")
         endif()
 
-        set(${postfix_var} "${_POSTFIX_WIDE}${_POSTFIX_DEBUG}${_POSTFIX_CRT}" CACHE STRING "Windows binary postfix, e.g. expat<postfix=[w][d][MD|MT]>.lib")
+#        set(${postfix_var} "${_POSTFIX_WIDE}${_POSTFIX_DEBUG}${_POSTFIX_CRT}" CACHE STRING "Windows binary postfix, e.g. expat<postfix=[w][d][MD|MT]>.lib")
     endforeach()
 endif(WIN32)
 
@@ -245,10 +283,24 @@ set(expat_SRCS
 #   lib/xmltok_ns.c
 )
 
+if (WIN32)
+	set( CMAKE_SHARED_LIBRARY_PREFIX "lib" )
+	set( CMAKE_STATIC_LIBRARY_PREFIX "lib" )
+endif()
+
 if(EXPAT_SHARED_LIBS)
     set(_SHARED SHARED)
     if(MSVC)
         set(expat_SRCS ${expat_SRCS} lib/libexpat.def)
+        include( Windows-MyDllVersion )
+        generate_product_dll_version(EXPAT_VERSION_FILES
+            NAME "expat - XML Parser Toolkit"
+            VERSION_MAJOR ${EXPAT_VER_MAJOR}
+            VERSION_MINOR ${EXPAT_VER_MINOR}
+            VERSION_PATCH ${EXPAT_VER_PATCH}
+            VERSION_REVISION ${MY_REVISION}
+            ORIGINAL_FILENAME "libexpat.dll")
+        set (expat_SRCS ${expat_SRCS} ${EXPAT_VERSION_FILES})    
     endif(MSVC)
 else(EXPAT_SHARED_LIBS)
     set(_SHARED STATIC)
@@ -258,6 +310,10 @@ else(EXPAT_SHARED_LIBS)
 endif(EXPAT_SHARED_LIBS)
 
 add_library(expat ${_SHARED} ${expat_SRCS})
+if(NOT EXPAT_SHARED_LIBS)
+    set_target_properties(expat PROPERTIES
+        OUTPUT_NAME "expat_static")
+endif()
 if(EXPAT_WITH_LIBBSD)
     target_link_libraries(expat ${LIB_BSD})
 endif()
@@ -273,12 +329,16 @@ if(NOT WIN32)
     set_property(TARGET expat PROPERTY NO_SONAME ${NO_SONAME})
 endif(NOT WIN32)
 
-expat_install(TARGETS expat EXPORT expat
-                      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-                      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-                      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if(NOT EXPAT_WITHOUT_INSTALL_LIBRARIES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+    expat_install(TARGETS expat EXPORT expat
+                          RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+                          LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+                          ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
 
-expat_install(FILES lib/expat.h lib/expat_external.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+if(NOT EXPAT_WITHOUT_INSTALL_HEADERS AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+    expat_install(FILES lib/expat.h lib/expat_external.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
 
 #
 # pkg-config file
@@ -289,7 +349,9 @@ if(NOT MSVC)
     set(libdir "\${exec_prefix}/${CMAKE_INSTALL_LIBDIR}")
     set(includedir "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
     configure_file(expat.pc.in ${CMAKE_CURRENT_BINARY_DIR}/expat.pc @ONLY)
-    expat_install(FILES ${CMAKE_CURRENT_BINARY_DIR}/expat.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+    if(NOT EXPAT_WITHOUT_INSTALL_FILES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+        expat_install(FILES ${CMAKE_CURRENT_BINARY_DIR}/expat.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+    endif()
 endif()
 
 #
@@ -306,14 +368,16 @@ if(EXPAT_BUILD_TOOLS)
     add_executable(xmlwf ${xmlwf_SRCS})
     set_property(TARGET xmlwf PROPERTY RUNTIME_OUTPUT_DIRECTORY xmlwf)
     target_link_libraries(xmlwf expat)
-    expat_install(TARGETS xmlwf DESTINATION ${CMAKE_INSTALL_BINDIR})
+    if(NOT EXPAT_WITHOUT_INSTALL_FILES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+        expat_install(TARGETS xmlwf DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
 
     if(MINGW AND _EXPAT_UNICODE_WCHAR_T)
         # https://gcc.gnu.org/onlinedocs/gcc/x86-Windows-Options.html
         set_target_properties(xmlwf PROPERTIES LINK_FLAGS -municode)
     endif()
 
-    if(EXPAT_BUILD_DOCS)
+    if(EXPAT_BUILD_DOCS AND NOT EXPAT_WITHOUT_INSTALL_FILES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
         file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/doc)
         add_custom_command(TARGET expat PRE_BUILD COMMAND "${DOCBOOK_TO_MAN}" "${PROJECT_SOURCE_DIR}/doc/xmlwf.xml" && mv "XMLWF.1" "${PROJECT_BINARY_DIR}/doc/xmlwf.1")
         expat_install(FILES "${PROJECT_BINARY_DIR}/doc/xmlwf.1" DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
@@ -469,12 +533,14 @@ endif()
 # Documentation
 #
 configure_file(Changes changelog COPYONLY)
-expat_install(
-    FILES
-        AUTHORS
-        ${CMAKE_CURRENT_BINARY_DIR}/changelog
-    DESTINATION
-        ${CMAKE_INSTALL_DOCDIR})
+if(NOT EXPAT_WITHOUT_INSTALL_FILES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+    expat_install(
+        FILES
+            AUTHORS
+            ${CMAKE_CURRENT_BINARY_DIR}/changelog
+        DESTINATION
+            ${CMAKE_INSTALL_DOCDIR})
+endif()
 
 #
 # CMake files for find_package(expat [..] CONFIG [..])
@@ -495,21 +561,23 @@ export(
     FILE
         cmake/expat-targets.cmake  # not going to be installed
 )
-expat_install(
-    FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/cmake/expat-config.cmake
-        ${CMAKE_CURRENT_BINARY_DIR}/cmake/expat-config-version.cmake
-    DESTINATION
-        ${CMAKE_INSTALL_LIBDIR}/cmake/expat-${PROJECT_VERSION}/
-)
-expat_install(
-    EXPORT
-        expat
-    DESTINATION
-        ${CMAKE_INSTALL_LIBDIR}/cmake/expat-${PROJECT_VERSION}/
-    NAMESPACE
-        expat::
-)
+if(NOT EXPAT_WITHOUT_INSTALL_FILES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+    expat_install(
+        FILES
+            ${CMAKE_CURRENT_BINARY_DIR}/cmake/expat-config.cmake
+            ${CMAKE_CURRENT_BINARY_DIR}/cmake/expat-config-version.cmake
+        DESTINATION
+            ${CMAKE_INSTALL_LIBDIR}/cmake/expat-${PROJECT_VERSION}/
+    )
+    expat_install(
+        EXPORT
+            expat
+        DESTINATION
+            ${CMAKE_INSTALL_LIBDIR}/cmake/expat-${PROJECT_VERSION}/
+        NAMESPACE
+            expat::
+    )
+endif()
 
 #
 # Summary
@@ -527,21 +595,21 @@ elseif(EXPAT_CHAR_TYPE STREQUAL "wchar_t")
 else()
     set(_EXPAT_CHAR_TYPE_SUMMARY "ERROR")
 endif()
-string(TOUPPER "${CMAKE_BUILD_TYPE}" _EXPAT_BUILD_TYPE_UPPER)
+#string(TOUPPER "${CMAKE_BUILD_TYPE}" _EXPAT_BUILD_TYPE_UPPER)
 
 message(STATUS "===========================================================================")
 message(STATUS "")
 message(STATUS "Configuration")
 message(STATUS "  Prefix ..................... ${CMAKE_INSTALL_PREFIX}")
-message(STATUS "  Build type ................. ${CMAKE_BUILD_TYPE}")
+#message(STATUS "  Build type ................. ${CMAKE_BUILD_TYPE}")
 message(STATUS "  Shared libraries ........... ${EXPAT_SHARED_LIBS}")
-if(MSVC)
-    message(STATUS "  Static CRT ................. ${EXPAT_MSVC_STATIC_CRT}")
-endif()
+#if(MSVC)
+#    message(STATUS "  Static CRT ................. ${EXPAT_MSVC_STATIC_CRT}")
+#endif()
 message(STATUS "  Character type ............. ${_EXPAT_CHAR_TYPE_SUMMARY}")
-if(WIN32)
-    message(STATUS "  Binary postfix ............. ${CMAKE_${_EXPAT_BUILD_TYPE_UPPER}_POSTFIX}")
-endif()
+#if(WIN32)
+#    message(STATUS "  Binary postfix ............. ${CMAKE_${_EXPAT_BUILD_TYPE_UPPER}_POSTFIX}")
+#endif()
 message(STATUS "")
 message(STATUS "  Build documentation ........ ${EXPAT_BUILD_DOCS}")
 message(STATUS "  Build examples ............. ${EXPAT_BUILD_EXAMPLES}")
