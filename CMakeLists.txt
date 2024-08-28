@@ -89,6 +89,10 @@ endif()
 
 option(EXPAT_WITH_SHARED_LIBRARIES "Build shared version of the expat library." OFF)
 option(EXPAT_WITHOUT_APPS "Build expat without apps." OFF)
+option(EXPAT_WITHOUT_INSTALL_ALL "Build expat without installing all artifacts." OFF)
+option(EXPAT_WITHOUT_INSTALL_FILES "Build expat without installing files." OFF)
+option(EXPAT_WITHOUT_INSTALL_HEADERS "Build expat without installing headers." OFF)
+option(EXPAT_WITHOUT_INSTALL_LIBRARIES "Build expat without installing libraries." OFF)
 option(EXPAT_WITHOUT_TEST_APPS "Build expat without test apps." OFF)
 if(EXPAT_WITHOUT_APPS)
     set(EXPAT_BUILD_EXAMPLES OFF)
@@ -194,8 +198,9 @@ endmacro()
 
 configure_file(expat_config.h.cmake "${CMAKE_CURRENT_BINARY_DIR}/expat_config.h")
 add_definitions(-DHAVE_EXPAT_CONFIG_H)
-expat_install(FILES "${CMAKE_CURRENT_BINARY_DIR}/expat_config.h" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-
+if(NOT EXPAT_WITHOUT_INSTALL_HEADERS AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+    expat_install(FILES "${CMAKE_CURRENT_BINARY_DIR}/expat_config.h" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
 
 set(EXTRA_COMPILE_FLAGS)
 if(FLAG_NO_STRICT_ALIASING)
@@ -324,12 +329,16 @@ if(NOT WIN32)
     set_property(TARGET expat PROPERTY NO_SONAME ${NO_SONAME})
 endif(NOT WIN32)
 
-expat_install(TARGETS expat EXPORT expat
-                      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-                      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-                      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+if(NOT EXPAT_WITHOUT_INSTALL_LIBRARIES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+    expat_install(TARGETS expat EXPORT expat
+                          RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+                          LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+                          ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
 
-expat_install(FILES lib/expat.h lib/expat_external.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+if(NOT EXPAT_WITHOUT_INSTALL_HEADERS AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+    expat_install(FILES lib/expat.h lib/expat_external.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
 
 #
 # pkg-config file
@@ -340,7 +349,9 @@ if(NOT MSVC)
     set(libdir "\${exec_prefix}/${CMAKE_INSTALL_LIBDIR}")
     set(includedir "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
     configure_file(expat.pc.in ${CMAKE_CURRENT_BINARY_DIR}/expat.pc @ONLY)
-    expat_install(FILES ${CMAKE_CURRENT_BINARY_DIR}/expat.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+    if(NOT EXPAT_WITHOUT_INSTALL_FILES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+        expat_install(FILES ${CMAKE_CURRENT_BINARY_DIR}/expat.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+    endif()
 endif()
 
 #
@@ -357,14 +368,16 @@ if(EXPAT_BUILD_TOOLS)
     add_executable(xmlwf ${xmlwf_SRCS})
     set_property(TARGET xmlwf PROPERTY RUNTIME_OUTPUT_DIRECTORY xmlwf)
     target_link_libraries(xmlwf expat)
-    expat_install(TARGETS xmlwf DESTINATION ${CMAKE_INSTALL_BINDIR})
+    if(NOT EXPAT_WITHOUT_INSTALL_FILES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+        expat_install(TARGETS xmlwf DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
 
     if(MINGW AND _EXPAT_UNICODE_WCHAR_T)
         # https://gcc.gnu.org/onlinedocs/gcc/x86-Windows-Options.html
         set_target_properties(xmlwf PROPERTIES LINK_FLAGS -municode)
     endif()
 
-    if(EXPAT_BUILD_DOCS)
+    if(EXPAT_BUILD_DOCS AND NOT EXPAT_WITHOUT_INSTALL_FILES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
         file(MAKE_DIRECTORY ${PROJECT_BINARY_DIR}/doc)
         add_custom_command(TARGET expat PRE_BUILD COMMAND "${DOCBOOK_TO_MAN}" "${PROJECT_SOURCE_DIR}/doc/xmlwf.xml" && mv "XMLWF.1" "${PROJECT_BINARY_DIR}/doc/xmlwf.1")
         expat_install(FILES "${PROJECT_BINARY_DIR}/doc/xmlwf.1" DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
@@ -520,12 +533,14 @@ endif()
 # Documentation
 #
 configure_file(Changes changelog COPYONLY)
-expat_install(
-    FILES
-        AUTHORS
-        ${CMAKE_CURRENT_BINARY_DIR}/changelog
-    DESTINATION
-        ${CMAKE_INSTALL_DOCDIR})
+if(NOT EXPAT_WITHOUT_INSTALL_FILES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+    expat_install(
+        FILES
+            AUTHORS
+            ${CMAKE_CURRENT_BINARY_DIR}/changelog
+        DESTINATION
+            ${CMAKE_INSTALL_DOCDIR})
+endif()
 
 #
 # CMake files for find_package(expat [..] CONFIG [..])
@@ -546,21 +561,23 @@ export(
     FILE
         cmake/expat-targets.cmake  # not going to be installed
 )
-expat_install(
-    FILES
-        ${CMAKE_CURRENT_BINARY_DIR}/cmake/expat-config.cmake
-        ${CMAKE_CURRENT_BINARY_DIR}/cmake/expat-config-version.cmake
-    DESTINATION
-        ${CMAKE_INSTALL_LIBDIR}/cmake/expat-${PROJECT_VERSION}/
-)
-expat_install(
-    EXPORT
-        expat
-    DESTINATION
-        ${CMAKE_INSTALL_LIBDIR}/cmake/expat-${PROJECT_VERSION}/
-    NAMESPACE
-        expat::
-)
+if(NOT EXPAT_WITHOUT_INSTALL_FILES AND NOT EXPAT_WITHOUT_INSTALL_ALL)
+    expat_install(
+        FILES
+            ${CMAKE_CURRENT_BINARY_DIR}/cmake/expat-config.cmake
+            ${CMAKE_CURRENT_BINARY_DIR}/cmake/expat-config-version.cmake
+        DESTINATION
+            ${CMAKE_INSTALL_LIBDIR}/cmake/expat-${PROJECT_VERSION}/
+    )
+    expat_install(
+        EXPORT
+            expat
+        DESTINATION
+            ${CMAKE_INSTALL_LIBDIR}/cmake/expat-${PROJECT_VERSION}/
+        NAMESPACE
+            expat::
+    )
+endif()
 
 #
 # Summary
