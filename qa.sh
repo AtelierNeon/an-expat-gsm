@@ -57,6 +57,11 @@ populate_environment() {
                 # http://clang.llvm.org/docs/AddressSanitizer.html
                 BASE_COMPILE_FLAGS+=" -g -fsanitize=address -fno-omit-frame-pointer -fno-common"
                 BASE_LINK_FLAGS+=" -g -fsanitize=address"
+                # macOS's XCode does not support LeakSanitizer and reports error:
+                # AddressSanitizer: detect_leaks is not supported on this platform.
+                if [[ "$(uname -s)" != Darwin* ]]; then
+                    export ASAN_OPTIONS=detect_leaks=1
+                fi
                 ;;
             memory)
                 # http://clang.llvm.org/docs/MemorySanitizer.html
@@ -96,6 +101,7 @@ run_cmake() {
 
         -DCMAKE_LINKER="${LD}"
         -DCMAKE_EXE_LINKER_FLAGS="${LDFLAGS}"
+        -DCMAKE_MODULE_LINKER_FLAGS="${LDFLAGS}"
         -DCMAKE_SHARED_LINKER_FLAGS="${LDFLAGS}"
 
         -DEXPAT_WARNINGS_AS_ERRORS=ON
@@ -126,18 +132,20 @@ run_tests() {
                     /usr/i686-w64-mingw32/lib/libwinpthread-1.dll \
                     /usr/lib/gcc/i686-w64-mingw32/*/libgcc_s_sjlj-1.dll \
                     /usr/lib/gcc/i686-w64-mingw32/*/libstdc++-6.dll \
-                    "$PWD"/libexpat.dll \
+                    "$PWD"/libexpat{,w}.dll \
                     ${i}/
         done
     fi
 
-    local make_env_args=(
+    local make_args=(
         CTEST_OUTPUT_ON_FAILURE=1
         CTEST_PARALLEL_LEVEL=2
         VERBOSE=1
+        test
     )
+    [[ $* =~ -DEXPAT_DTD=OFF ]] || make_args+=( run-xmltest )
 
-    RUN "${MAKE}" "${make_env_args[@]}" test run-xmltest
+    RUN "${MAKE}" "${make_args[@]}"
 }
 
 
@@ -180,7 +188,7 @@ run() {
 
     run_cmake "$@"
     run_compile
-    run_tests
+    run_tests "$@"
     run_processor
 }
 
