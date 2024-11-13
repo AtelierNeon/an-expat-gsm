@@ -340,6 +340,11 @@ set(expat_SRCS
 #   lib/xmltok_ns.c
 )
 
+if(WIN32)
+    set(CMAKE_SHARED_LIBRARY_PREFIX "lib")
+    set(CMAKE_STATIC_LIBRARY_PREFIX "lib")
+endif()
+
 if(EXPAT_SHARED_LIBS)
     set(_SHARED SHARED)
     if(MSVC)
@@ -370,9 +375,9 @@ else()
 endif()
 
 if(EXPAT_SHARED_LIBS)
-    set(_EXPAT_OUTPUT_NAME libexpat)
+    set(_EXPAT_OUTPUT_NAME expat)
 else()
-    set(_EXPAT_OUTPUT_NAME libexpat_static)
+    set(_EXPAT_OUTPUT_NAME expat_static)
 endif()
 
 add_library(expat ${_SHARED} ${expat_SRCS})
