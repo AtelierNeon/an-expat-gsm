@@ -7,12 +7,12 @@
 #
 # Copyright (c) 2010      Patrick Spendrin <ps_ml@gmx.de>
 # Copyright (c) 2012      Karl Waclawek <karl@waclawek.net>
-# Copyright (c) 2016-2022 Sebastian Pipping <sebastian@pipping.org>
+# Copyright (c) 2016-2024 Sebastian Pipping <sebastian@pipping.org>
 # Copyright (c) 2016      Sergei Nikulov <sergey.nikulov@gmail.com>
 # Copyright (c) 2016      Björn Lindahl <bjorn.lindahl@foi.se>
 # Copyright (c) 2016      Tobias Taschner <github@tc84.de>
 # Copyright (c) 2016      Ben Boeckel <ben.boeckel@kitware.com>
-# Copyright (c) 2017      Rhodri James <rhodri@wildebeest.org.uk>
+# Copyright (c) 2017-2022 Rhodri James <rhodri@wildebeest.org.uk>
 # Copyright (c) 2017      Rolf Eike Beer <eike@sf-mail.de>
 # Copyright (c) 2017      Stephen Groat <stephen@groat.us>
 # Copyright (c) 2017      Franek Korta <fkorta@gmail.com>
@@ -34,14 +34,17 @@
 # Unlike most of Expat,
 # this file is copyrighted under the BSD-license for buildsystem files of KDE.
 
-cmake_minimum_required(VERSION 3.1.3...3.15.0)
+cmake_minimum_required(VERSION 3.5.0)
 
 project(expat
     VERSION
-        2.4.9
+        2.6.4
     LANGUAGES
         C
 )
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)  # i.e. -std=c99 rather than default -std=gnu99
 
 ## Separate version number into 4 parts
 string(REGEX MATCHALL "[0-9]+" _my_ver_LIST "${PROJECT_VERSION}")
@@ -55,7 +58,7 @@ endif()
 
 message( STATUS "expat version ${PROJECT_VERSION}" )
 
-set(PACKAGE_BUGREPORT "expat-bugs@libexpat.org")
+set(PACKAGE_BUGREPORT "https://github.com/libexpat/libexpat/issues")
 set(PACKAGE_NAME "expat")
 set(PACKAGE_VERSION "${PROJECT_VERSION}")
 set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
@@ -148,10 +151,12 @@ if(UNIX OR _EXPAT_HELP)
     expat_shy_set(EXPAT_WITH_LIBBSD OFF CACHE BOOL "Utilize libbsd (for arc4random_buf)")
 endif()
 expat_shy_set(EXPAT_ENABLE_INSTALL ON CACHE BOOL "Install expat files in cmake install target")
-expat_shy_set(EXPAT_CONTEXT_BYTES 1024 CACHE STRING "Define to specify how much context to retain around the current parse point")
+expat_shy_set(EXPAT_CONTEXT_BYTES 1024 CACHE STRING "Define to specify how much context to retain around the current parse point, 0 to disable")
 mark_as_advanced(EXPAT_CONTEXT_BYTES)
 expat_shy_set(EXPAT_DTD ON CACHE BOOL "Define to make parameter entity parsing functionality available")
 mark_as_advanced(EXPAT_DTD)
+expat_shy_set(EXPAT_GE ON CACHE BOOL "Define to make general entity parsing functionality available")
+mark_as_advanced(EXPAT_GE)
 expat_shy_set(EXPAT_NS ON CACHE BOOL "Define to make XML Namespaces functionality available")
 mark_as_advanced(EXPAT_NS)
 expat_shy_set(EXPAT_WARNINGS_AS_ERRORS OFF CACHE BOOL "Treat all compiler warnings as errors")
@@ -179,6 +184,10 @@ endif()
 if(EXPAT_BUILD_TESTS)
     # We have to call enable_language() before modifying any CMAKE_CXX_* variables
     enable_language(CXX)
+
+    set(CMAKE_CXX_STANDARD 11)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CMAKE_CXX_EXTENSIONS OFF)  # i.e. -std=c++11 rather than default -std=gnu++11
 endif()
 
 option(EXPAT_WITH_SHARED_LIBRARIES "Build shared version of the expat library." OFF)
@@ -209,6 +218,11 @@ endif()
 #
 # Environment checks
 #
+if(EXPAT_DTD AND NOT EXPAT_GE)
+    message(SEND_ERROR "Option EXPAT_DTD requires that EXPAT_GE is also enabled.")
+    message(SEND_ERROR "Please either enable option EXPAT_GE (recommended) or disable EXPAT_DTD also.")
+endif()
+
 if(EXPAT_WITH_LIBBSD)
     find_library(LIB_BSD NAMES bsd)
     if(NOT LIB_BSD)
@@ -224,8 +238,8 @@ if(MSVC)
     # - https://sourceforge.net/p/predef/wiki/Compilers/
     # - https://en.wikipedia.org/wiki/Microsoft_Visual_Studio#History
     set(_EXPAT_MSVC_REQUIRED_INT 1800)  # i.e. 12.0/2013/1800; see PR #426
-    set(_EXPAT_MSVC_SUPPORTED_INT 1910)
-    set(_EXPAT_MSVC_SUPPORTED_DISPLAY "Visual Studio 15.0/2017/${_EXPAT_MSVC_SUPPORTED_INT}")
+    set(_EXPAT_MSVC_SUPPORTED_INT 1920)
+    set(_EXPAT_MSVC_SUPPORTED_DISPLAY "Visual Studio 16.0/2019/${_EXPAT_MSVC_SUPPORTED_INT}")
 
     if(MSVC_VERSION VERSION_LESS ${_EXPAT_MSVC_SUPPORTED_INT})
         if(MSVC_VERSION VERSION_LESS ${_EXPAT_MSVC_REQUIRED_INT})
@@ -311,11 +325,15 @@ endif()
 
 _expat_copy_bool_int(EXPAT_ATTR_INFO        XML_ATTR_INFO)
 _expat_copy_bool_int(EXPAT_DTD              XML_DTD)
+_expat_copy_bool_int(EXPAT_GE               XML_GE)
 _expat_copy_bool_int(EXPAT_LARGE_SIZE       XML_LARGE_SIZE)
 _expat_copy_bool_int(EXPAT_MIN_SIZE         XML_MIN_SIZE)
 _expat_copy_bool_int(EXPAT_NS               XML_NS)
 if(NOT WIN32)
     _expat_copy_bool_int(EXPAT_DEV_URANDOM  XML_DEV_URANDOM)
+endif()
+if(NOT EXPAT_CONTEXT_BYTES GREATER 0)  # in particular with -DEXPAT_CONTEXT_BYTES=OFF
+    set(EXPAT_CONTEXT_BYTES 0)
 endif()
 set(XML_CONTEXT_BYTES ${EXPAT_CONTEXT_BYTES})
 
@@ -349,6 +367,10 @@ if (EXPAT_WARNINGS_AS_ERRORS)
         add_definitions(/WX)
     else()
         set(EXTRA_COMPILE_FLAGS "${EXTRA_COMPILE_FLAGS} -Werror")
+        if(MINGW)
+            # To avoid "error: unknown conversion type character ‘l’ in format [-Werror=format=]"
+            set(EXTRA_COMPILE_FLAGS "${EXTRA_COMPILE_FLAGS} -Wno-format")
+        endif()
     endif()
 endif()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_COMPILE_FLAGS}")
@@ -424,7 +446,13 @@ if(EXPAT_SHARED_LIBS)
             endif()
         endmacro()
 
-        _expat_def_file_toggle(EXPAT_DTD _EXPAT_COMMENT_DTD)
+        if(EXPAT_DTD OR EXPAT_GE)
+            set(_EXPAT_DTD_OR_GE TRUE)
+        else()
+            set(_EXPAT_DTD_OR_GE FALSE)
+        endif()
+
+        _expat_def_file_toggle(_EXPAT_DTD_OR_GE _EXPAT_COMMENT_DTD_OR_GE)
         _expat_def_file_toggle(EXPAT_ATTR_INFO _EXPAT_COMMENT_ATTR_INFO)
 
         configure_file("${CMAKE_CURRENT_SOURCE_DIR}/lib/libexpat.def.cmake" "${CMAKE_CURRENT_BINARY_DIR}/lib/libexpat.def")
@@ -432,13 +460,15 @@ if(EXPAT_SHARED_LIBS)
 
         # Add DLL version
         string(REPLACE "." "," _EXPAT_DLL_VERSION ${PROJECT_VERSION}.0)
-        set(_EXPAT_EXTRA_SOURCES ${_EXPAT_EXTRA_SOURCES} win32/version.rc)
+        configure_file("${CMAKE_CURRENT_SOURCE_DIR}/win32/version.rc.cmake" "${CMAKE_CURRENT_BINARY_DIR}/win32/version.rc")
+        set(_EXPAT_EXTRA_SOURCES ${_EXPAT_EXTRA_SOURCES} "${CMAKE_CURRENT_BINARY_DIR}/win32/version.rc")
     endif()
 else()
     set(_SHARED STATIC)
 endif()
 
 add_library(expat ${_SHARED} ${_EXPAT_C_SOURCES} ${_EXPAT_EXTRA_SOURCES})
+add_library(expat::expat ALIAS expat)
 if(_EXPAT_LIBM_FOUND)
     target_link_libraries(expat m)
 endif()
@@ -479,9 +509,9 @@ foreach(build_type_upper
     #set_property(TARGET expat PROPERTY ${build_type_upper}_POSTFIX ${EXPAT_${build_type_upper}_POSTFIX})
 endforeach()
 
-set(LIBCURRENT 9)   # sync
-set(LIBREVISION 9)  # with
-set(LIBAGE 8)       # configure.ac!
+set(LIBCURRENT 11)  # sync
+set(LIBREVISION 0)  # with
+set(LIBAGE 10)      # configure.ac!
 math(EXPR LIBCURRENT_MINUS_AGE "${LIBCURRENT} - ${LIBAGE}")
 
 if(NOT WIN32)
@@ -494,7 +524,7 @@ if(NOT WIN32)
             message(FATAL_ERROR "Expat requires CMake >=3.17 on platform \"APPLE\".")
         endif()
 
-        # NOTE: This intends to talk CMake into compatiblity with GNU Libtool
+        # NOTE: This intends to talk CMake into compatibility with GNU Libtool
         math(EXPR _EXPAT_MACHO_COMPATIBILITY_VERSION "${LIBCURRENT} + 1")
         set(_EXPAT_MACHO_CURRENT_VERSION "${_EXPAT_MACHO_COMPATIBILITY_VERSION}.${LIBREVISION}")
         set_property(TARGET expat PROPERTY MACHO_COMPATIBILITY_VERSION ${_EXPAT_MACHO_COMPATIBILITY_VERSION})
@@ -502,7 +532,7 @@ if(NOT WIN32)
     endif()
 endif()
 
-if(MINGW)
+if(MINGW AND EXPAT_SHARED_LIBS)
     set_target_properties(expat PROPERTIES SUFFIX "-${LIBCURRENT_MINUS_AGE}.dll")
 endif()
 
@@ -512,7 +542,7 @@ if(WIN32 AND NOT MINGW)
     #       Everything but MSVC is already adding prefix "lib", automatically.
     # NOTE: "set_property(TARGET expat PROPERTY PREFIX lib)" would only affect *.dll
     #       files but not *.lib files, so we have to rely on property OUTPUT_NAME, instead.
-    #       Property CMAKE_*_POSTFIX still applies.
+    #       Target property <CONFIG>_POSTFIX still applies.
     set(_EXPAT_OUTPUT_NAME libexpat)
     set_property(TARGET expat PROPERTY OUTPUT_NAME ${_EXPAT_OUTPUT_NAME})
 else()
@@ -574,8 +604,8 @@ if(EXPAT_BUILD_PKGCONFIG)
     foreach(_build_type ${CMAKE_BUILD_TYPE} Debug Release RelWithDebInfo MinSizeRel)
         string(TOLOWER "${_build_type}" _build_type_lower)
         string(TOUPPER "${_build_type}" _build_type_upper)
-        set_property(TARGET expat PROPERTY "pkgconfig_${_build_type_lower}_name" "expat${CMAKE_${_build_type_upper}_POSTFIX}")
-        set_property(TARGET expat PROPERTY "pkgconfig_${_build_type_lower}_output_name" "${_EXPAT_OUTPUT_NAME}${CMAKE_${_build_type_upper}_POSTFIX}")
+        set_property(TARGET expat PROPERTY "pkgconfig_${_build_type_lower}_name" "expat${EXPAT_${_build_type_upper}_POSTFIX}")
+        set_property(TARGET expat PROPERTY "pkgconfig_${_build_type_lower}_output_name" "${_EXPAT_OUTPUT_NAME}${EXPAT_${_build_type_upper}_POSTFIX}")
         if(_EXPAT_LIBM_FOUND)
             set_property(TARGET expat PROPERTY "pkgconfig_libm" "-lm")
         else()
@@ -597,10 +627,10 @@ endif()
 #
 if(EXPAT_BUILD_TOOLS)
     set(xmlwf_SRCS
-        xmlwf/xmlwf.c
-        xmlwf/xmlfile.c
         xmlwf/codepage.c
         xmlwf/readfilemap.c
+        xmlwf/xmlfile.c
+        xmlwf/xmlwf.c
     )
 
     add_executable(xmlwf ${xmlwf_SRCS})
@@ -637,13 +667,11 @@ endif()
 # C code examples
 #
 if(EXPAT_BUILD_EXAMPLES)
-    add_executable(elements examples/elements.c)
-    set_property(TARGET elements PROPERTY RUNTIME_OUTPUT_DIRECTORY examples)
-    target_link_libraries(elements expat)
-
-    add_executable(outline examples/outline.c)
-    set_property(TARGET outline PROPERTY RUNTIME_OUTPUT_DIRECTORY examples)
-    target_link_libraries(outline expat)
+    foreach(_target element_declarations elements outline)
+        add_executable(${_target} examples/${_target}.c)
+        set_property(TARGET ${_target} PROPERTY RUNTIME_OUTPUT_DIRECTORY examples)
+        target_link_libraries(${_target} expat)
+    endforeach()
 endif()
 
 #
@@ -652,14 +680,6 @@ endif()
 if(EXPAT_BUILD_TESTS)
     ## these are unittests that can be run on any platform
     enable_testing()
-
-    set(test_SRCS
-        tests/chardata.c
-        tests/memcheck.c
-        tests/minicheck.c
-        tests/structdata.c
-        ${_EXPAT_C_SOURCES}
-    )
 
     if(NOT MSVC)
         if(MINGW)
@@ -676,11 +696,47 @@ if(EXPAT_BUILD_TESTS)
         endif()
     endfunction()
 
-    set(_EXPAT_TEST_TARGETS runtests runtestspp)
-    add_executable(runtests   tests/runtests.c     ${test_SRCS})
-    add_executable(runtestspp tests/runtestspp.cpp ${test_SRCS})
+    set(_EXPAT_TEST_TARGETS runtests runtests_cxx)
+
+    add_executable(runtests
+        tests/acc_tests.c
+        tests/alloc_tests.c
+        tests/basic_tests.c
+        tests/chardata.c
+        tests/common.c
+        tests/dummy.c
+        tests/handlers.c
+        tests/memcheck.c
+        tests/minicheck.c
+        tests/misc_tests.c
+        tests/ns_tests.c
+        tests/nsalloc_tests.c
+        tests/runtests.c
+        tests/structdata.c
+        ${_EXPAT_C_SOURCES}
+    )
+
+    add_executable(runtests_cxx
+        tests/acc_tests_cxx.cpp
+        tests/alloc_tests_cxx.cpp
+        tests/basic_tests_cxx.cpp
+        tests/chardata_cxx.cpp
+        tests/common_cxx.cpp
+        tests/dummy_cxx.cpp
+        tests/handlers_cxx.cpp
+        tests/memcheck_cxx.cpp
+        tests/minicheck_cxx.cpp
+        tests/misc_tests_cxx.cpp
+        tests/ns_tests_cxx.cpp
+        tests/nsalloc_tests_cxx.cpp
+        tests/runtests_cxx.cpp
+        tests/structdata_cxx.cpp
+        ${_EXPAT_C_SOURCES}
+    )
 
     foreach(_target ${_EXPAT_TEST_TARGETS})
+        target_compile_definitions(${_target} PRIVATE -DXML_TESTING)
+
         set_property(TARGET ${_target} PROPERTY RUNTIME_OUTPUT_DIRECTORY tests)
         expat_add_test(${_target} $<TARGET_FILE:${_target}>)
 
@@ -692,6 +748,10 @@ if(EXPAT_BUILD_TESTS)
             target_link_libraries(${_target} ${LIB_BSD})
         endif()
     endforeach()
+
+    add_executable(benchmark tests/benchmark/benchmark.c)
+    set_property(TARGET benchmark PROPERTY RUNTIME_OUTPUT_DIRECTORY tests/benchmark)
+    target_link_libraries(benchmark expat)
 endif()
 
 #
@@ -955,6 +1015,7 @@ message(STATUS "    // Advanced options, changes not advised")
 message(STATUS "    Attributes info .......... ${EXPAT_ATTR_INFO}")
 message(STATUS "    Context bytes ............ ${EXPAT_CONTEXT_BYTES}")
 message(STATUS "    DTD support .............. ${EXPAT_DTD}")
+message(STATUS "    General entities ......... ${EXPAT_GE}")
 message(STATUS "    Large size ............... ${EXPAT_LARGE_SIZE}")
 message(STATUS "    Minimum size ............. ${EXPAT_MIN_SIZE}")
 message(STATUS "    Namespace support ........ ${EXPAT_NS}")
