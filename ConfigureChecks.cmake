@@ -42,12 +42,6 @@ else()
     check_symbol_exists("getrandom" "sys/random.h" HAVE_GETRANDOM)
 endif()
 
-if(EXPAT_WITH_LIBBSD)
-    set(CMAKE_REQUIRED_LIBRARIES "${LIB_BSD}")
-    set(_bsd "bsd/")
-else()
-    set(_bsd "")
-endif()
 if(BUILD_WITH_COMPILER_PRECHECK AND WIN32)
     set(HAVE_ARC4RANDOM_BUF FALSE)
     set(HAVE_ARC4RANDOM FALSE)
@@ -82,6 +76,7 @@ else()
             #include <sys/types.h>
             int main(void) {
                 const off_t offset = -123;
+                (void)offset;
                 return 0;
             }"
             HAVE_OFF_T)
@@ -108,8 +103,25 @@ else()
 endif()
 
 if(BUILD_WITH_COMPILER_PRECHECK AND WIN32)
-    set(FLAG_NO_STRICT_ALIASING FALSE)
-    set(FLAG_VISIBILITY FALSE)
+    # If the compiler produces non-English messages and does not
+    # listen to CMake's request for English through environment variables
+    # LC_ALL/LC_MESSAGES/LANG, then command `check_c_compiler_flag` can produce
+    # false positives as seen with e.g. `cl` of MSVC 19.44.35217 configured
+    # to report errors in Italian language.
+    check_c_compiler_flag("-no-such-thing" _FLAG_DETECTION_UNUSABLE)
+
+    if (_FLAG_DETECTION_UNUSABLE)
+        message(WARNING
+            "Your compiler breaks CMake's command `check_c_compiler_flag`."
+            " HINT: Is it configured to report errors in a language other"
+            " than English?"
+        )
+        set(FLAG_WSTRICT_ALIASING FALSE)
+        set(FLAG_VISIBILITY FALSE)
+    else()
+        check_c_compiler_flag("-Wstrict-aliasing=3" FLAG_WSTRICT_ALIASING)
+        check_c_compiler_flag("-fvisibility=hidden" FLAG_VISIBILITY)
+    endif()
 else()
     check_c_compiler_flag("-fno-strict-aliasing" FLAG_NO_STRICT_ALIASING)
     check_c_compiler_flag("-fvisibility=hidden" FLAG_VISIBILITY)
