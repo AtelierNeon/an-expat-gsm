@@ -46,9 +46,9 @@ if(BUILD_WITH_COMPILER_PRECHECK AND WIN32)
     set(HAVE_ARC4RANDOM_BUF FALSE)
     set(HAVE_ARC4RANDOM FALSE)
 else()
-    check_symbol_exists("arc4random_buf" "${_bsd}stdlib.h" HAVE_ARC4RANDOM_BUF)
+    check_symbol_exists("arc4random_buf" "$stdlib.h" HAVE_ARC4RANDOM_BUF)
     if(NOT HAVE_ARC4RANDOM_BUF)
-        check_symbol_exists("arc4random" "${_bsd}stdlib.h" HAVE_ARC4RANDOM)
+        check_symbol_exists("arc4random" "$stdlib.h" HAVE_ARC4RANDOM)
     endif()
 endif()
 set(CMAKE_REQUIRED_LIBRARIES)
@@ -102,28 +102,30 @@ else()
         HAVE_SYSCALL_GETRANDOM)
 endif()
 
-if(BUILD_WITH_COMPILER_PRECHECK AND WIN32)
     # If the compiler produces non-English messages and does not
     # listen to CMake's request for English through environment variables
     # LC_ALL/LC_MESSAGES/LANG, then command `check_c_compiler_flag` can produce
     # false positives as seen with e.g. `cl` of MSVC 19.44.35217 configured
     # to report errors in Italian language.
-    check_c_compiler_flag("-no-such-thing" _FLAG_DETECTION_UNUSABLE)
-
-    if (_FLAG_DETECTION_UNUSABLE)
-        message(WARNING
-            "Your compiler breaks CMake's command `check_c_compiler_flag`."
-            " HINT: Is it configured to report errors in a language other"
-            " than English?"
-        )
-        set(FLAG_WSTRICT_ALIASING FALSE)
-        set(FLAG_VISIBILITY FALSE)
-    else()
-        check_c_compiler_flag("-Wstrict-aliasing=3" FLAG_WSTRICT_ALIASING)
-        check_c_compiler_flag("-fvisibility=hidden" FLAG_VISIBILITY)
-    endif()
+if(BUILD_WITH_COMPILER_PRECHECK AND WIN32)
+    set(_FLAG_DETECTION_UNUSABLE FALSE)
 else()
-    check_c_compiler_flag("-fno-strict-aliasing" FLAG_NO_STRICT_ALIASING)
+    check_c_compiler_flag("-no-such-thing" _FLAG_DETECTION_UNUSABLE)
+endif()
+
+if (_FLAG_DETECTION_UNUSABLE)
+    message(WARNING
+        "Your compiler breaks CMake's command `check_c_compiler_flag`."
+        " HINT: Is it configured to report errors in a language other"
+        " than English?"
+    )
+    set(FLAG_WSTRICT_ALIASING FALSE)
+    set(FLAG_VISIBILITY FALSE)
+elseif(BUILD_WITH_COMPILER_PRECHECK AND WIN32)
+    set(FLAG_WSTRICT_ALIASING FALSE)
+    set(FLAG_VISIBILITY FALSE)
+else()
+    check_c_compiler_flag("-Wstrict-aliasing=3" FLAG_WSTRICT_ALIASING)
     check_c_compiler_flag("-fvisibility=hidden" FLAG_VISIBILITY)
 endif()
 
