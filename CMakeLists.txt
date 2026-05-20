@@ -202,6 +202,7 @@ endif()
 option(EXPAT_WITH_SHARED_LIBRARIES "Build shared version of the expat library." OFF)
 option(EXPAT_WITH_VERBOSE_MESSAGE "Build expat with verbose message." OFF)
 option(EXPAT_WITHOUT_APPS "Build expat without apps." OFF)
+option(EXPAT_WITHOUT_CONFIGURE_VCRT "Build expat without configuring MSVC runtime." OFF)
 option(EXPAT_WITHOUT_INSTALL_ALL "Build expat without installing all artifacts." OFF)
 option(EXPAT_WITHOUT_INSTALL_FILES "Build expat without installing files." OFF)
 option(EXPAT_WITHOUT_INSTALL_HEADERS "Build expat without installing headers." OFF)
@@ -386,11 +387,13 @@ if (MSVC)
         message(SEND_ERROR "Policy CMP0091 behavior is '${_policy_cmp0091_behavior}' rather than 'NEW', mis-compilation detected.")
     endif()
 
-    message(STATUS "-- Using static CRT ${EXPAT_MSVC_STATIC_CRT}")
-    if (EXPAT_MSVC_STATIC_CRT)
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")  # .. without suffix "DLL": static
-    else()
-        set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")  # i.e. CMake default behavior: shared
+    if (NOT EXPAT_WITHOUT_CONFIGURE_VCRT)
+        message(STATUS "-- Using static CRT ${EXPAT_MSVC_STATIC_CRT}")
+        if (EXPAT_MSVC_STATIC_CRT)
+            set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")  # .. without suffix "DLL": static
+        else()
+            set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")  # i.e. CMake default behavior: shared
+        endif()
     endif()
 endif()
 
